@@ -12,7 +12,7 @@ VERSION := $(shell git describe)
 endif
 
 LD_FLAGS = -X github.com/tendermint/tendermint/version.TMCoreSemVer=$(VERSION)
-BUILD_FLAGS = -mod=readonly -ldflags "$(LD_FLAGS)"
+BUILD_FLAGS =  -ldflags "$(LD_FLAGS)"
 HTTPS_GIT := https://github.com/tendermint/tendermint.git
 CGO_ENABLED ?= 0
 
@@ -205,11 +205,11 @@ proto-check-breaking-ci:
 ###############################################################################
 
 build_abci:
-	@go build -mod=readonly -i ./abci/cmd/...
+	@go build  -i ./abci/cmd/...
 .PHONY: build_abci
 
 install_abci:
-	@go install -mod=readonly ./abci/cmd/...
+	@go install  ./abci/cmd/...
 .PHONY: install_abci
 
 ###############################################################################
@@ -405,4 +405,4 @@ $(BUILDDIR)/packages.txt:$(GO_TEST_FILES) $(BUILDDIR)
 split-test-packages:$(BUILDDIR)/packages.txt
 	split -d -n l/$(NUM_SPLIT) $< $<.
 test-group-%:split-test-packages
-	cat $(BUILDDIR)/packages.txt.$* | xargs go test -mod=readonly -timeout=5m -race -coverprofile=$(BUILDDIR)/$*.profile.out
+	cat $(BUILDDIR)/packages.txt.$* | xargs go test -timeout=5m -race -coverprofile=$(BUILDDIR)/$*.profile.out
