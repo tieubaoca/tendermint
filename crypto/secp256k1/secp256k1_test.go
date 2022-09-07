@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	underlyingSecp256k1 "github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcutil/base58"
+	"github.com/status-im/keycard-go/hexutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -24,7 +24,7 @@ var secpDataTable = []keyData{
 	{
 		priv: "a96e62ed3955e65be32703f12d87b6b5cf26039ecfa948dc5107a495418e5330",
 		pub:  "02950e1cdfcb133d6024109fd489f734eeb4502418e538c28481f22bce276f248c",
-		addr: "1CKZ9Nx4zgds8tU7nJHotKSDr4a9bYJCa3",
+		addr: "FABB9CC6EC839B1214BB11C53377A56A6ED81762",
 	},
 }
 
@@ -32,7 +32,7 @@ func TestPubKeySecp256k1Address(t *testing.T) {
 	for _, d := range secpDataTable {
 		privB, _ := hex.DecodeString(d.priv)
 		pubB, _ := hex.DecodeString(d.pub)
-		addrBbz, _, _ := base58.CheckDecode(d.addr)
+		addrBbz, _ := hex.DecodeString(d.addr)
 		addrB := crypto.Address(addrBbz)
 
 		priv := secp256k1.PrivKey(privB)
@@ -110,5 +110,32 @@ func TestGenPrivKeySecp256k1(t *testing.T) {
 			require.True(t, fe.Cmp(N) < 0)
 			require.True(t, fe.Sign() > 0)
 		})
+	}
+}
+
+func TestEthereumMessage(t *testing.T) {
+	tests := []struct {
+		msg []byte
+		sig []byte
+	}{
+		{
+			msg: []byte("my message"),
+			sig: hexutils.HexToBytes("2f2a192089984c99c203c38c18105ff9949037bb3d040c5fd90f39d2eda10ccf387a607d387f308c35ecfc62c769eb9d2f9ca9d5811009f2086c08eee3bccd181b"),
+		},
+		{
+			msg: []byte("hello world"),
+			sig: hexutils.HexToBytes("15ef352a615246ee988d9728cdb3e805dd350efda23d9e01a2dd1b1864f8defd548ae6adc4df83d3fce270edf992f92359db43831ac6bae06c4cad9fa9aaf20f1c"),
+		},
+	}
+
+	for _, test := range tests {
+		privKey := secp256k1.PrivKey(hexutils.HexToBytes(secpDataTable[0].priv))
+		pubKey := privKey.PubKey()
+
+		sig, err := privKey.Sign(test.msg)
+		require.NoError(t, err)
+		require.Equal(t, test.sig, sig)
+
+		require.True(t, pubKey.VerifySignature(test.msg, sig))
 	}
 }
