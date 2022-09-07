@@ -7,7 +7,6 @@ require (
 	github.com/Workiva/go-datastructures v1.0.53
 	github.com/adlio/schema v1.3.3
 	github.com/btcsuite/btcd v0.22.1
-	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
 	github.com/bufbuild/buf v1.3.1
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/creachadair/atomicfile v0.2.6
@@ -52,6 +51,5 @@ require (
 	golang.org/x/net v0.0.0-20220617184016-355a448f1bc9
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
 	google.golang.org/grpc v1.47.0
-	gotest.tools v2.2.0+incompatible // indirect
 	pgregory.net/rapid v0.4.8
 )
