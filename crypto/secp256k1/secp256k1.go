@@ -189,9 +189,8 @@ var secp256k1halfN = new(big.Int).Rsh(secp256k1.S256().N, 1)
 // The returned signature will be of the form R || S (in lower-S form).
 func (privKey PrivKey) Sign(msg []byte) ([]byte, error) {
 	priv, _ := ethcrypto.ToECDSA(privKey)
-	ethereumMsg := toEthereumMessage(msg)
 
-	sig, err := ethcrypto.Sign(ethcrypto.Keccak256(ethereumMsg), priv)
+	sig, err := ethcrypto.Sign(ethcrypto.Keccak256(msg), priv)
 
 	if err != nil {
 		return nil, err
@@ -207,7 +206,6 @@ func (pubKey PubKey) VerifySignature(msg []byte, sigStr []byte) bool {
 	if len(sigStr) != 65 {
 		return false
 	}
-	ethereumMsg := toEthereumMessage(msg)
 	sigStr[64] = byte(int(sigStr[64]) - 27)
 	pub, err := ethcrypto.DecompressPubkey(pubKey)
 	if err != nil {
@@ -217,7 +215,7 @@ func (pubKey PubKey) VerifySignature(msg []byte, sigStr []byte) bool {
 	// signature := signatureFromBytes(sigStr)
 	// Reject malleable signatures. libsecp256k1 does this check but btcec doesn't.
 	// see: https://github.com/ethereum/go-ethereum/blob/f9401ae011ddf7f8d2d95020b7446c17f8d98dc1/crypto/signature_nocgo.go#L90-L93
-	recPub, err := ethcrypto.SigToPub(ethcrypto.Keccak256(ethereumMsg), sigStr)
+	recPub, err := ethcrypto.SigToPub(ethcrypto.Keccak256(msg), sigStr)
 	if err != nil {
 		return false
 	}
@@ -244,12 +242,4 @@ func serializeSig(sig *secp256k1.Signature) []byte {
 	copy(sigBytes[32-len(rBytes):32], rBytes)
 	copy(sigBytes[64-len(sBytes):64], sBytes)
 	return sigBytes
-}
-
-// Convert normal message to Ethereum message
-// "\x19Ethereum Signed Message:\n" ‖ len(message) ‖ message
-func toEthereumMessage(msg []byte) []byte {
-	prefix := fmt.Sprintf("\x19Ethereum Signed Message:\n%d", len(msg))
-	ethereumMsg := append([]byte(prefix), msg...)
-	return ethereumMsg
 }
