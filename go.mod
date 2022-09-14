@@ -50,7 +50,7 @@ require (
 	github.com/vektra/mockery/v2 v2.14.0
 )
 
-require github.com/ethereum/go-ethereum v1.10.24
+require github.com/ethereum/go-ethereum v1.10.19
 
 require (
 	4d63.com/gochecknoglobals v0.1.0 // indirect
