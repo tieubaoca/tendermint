@@ -2,6 +2,7 @@ package secp256k1
 
 import (
 	"bytes"
+	// "crypto/ecdsa"
 	"crypto/sha256"
 	"crypto/subtle"
 	"fmt"
@@ -9,10 +10,12 @@ import (
 	"math/big"
 
 	secp256k1 "github.com/btcsuite/btcd/btcec"
-	"golang.org/x/crypto/ripemd160" //nolint: staticcheck // necessary for Bitcoin address format
-
 	"github.com/tendermint/tendermint/crypto"
 	tmjson "github.com/tendermint/tendermint/libs/json"
+
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	// necessary for Bitcoin address format
+	// "golang.org/x/crypto/ripemd160" // nolint
 )
 
 // -------------------------------------
@@ -122,26 +125,6 @@ func GenPrivKeySecp256k1(secret []byte) PrivKey {
 	return PrivKey(privKey32)
 }
 
-// used to reject malleable signatures
-// see:
-//   - https://github.com/ethereum/go-ethereum/blob/f9401ae011ddf7f8d2d95020b7446c17f8d98dc1/crypto/signature_nocgo.go#L90-L93
-//   - https://github.com/ethereum/go-ethereum/blob/f9401ae011ddf7f8d2d95020b7446c17f8d98dc1/crypto/crypto.go#L39
-var secp256k1halfN = new(big.Int).Rsh(secp256k1.S256().N, 1)
-
-// Sign creates an ECDSA signature on curve Secp256k1, using SHA256 on the msg.
-// The returned signature will be of the form R || S (in lower-S form).
-func (privKey PrivKey) Sign(msg []byte) ([]byte, error) {
-	priv, _ := secp256k1.PrivKeyFromBytes(secp256k1.S256(), privKey)
-
-	sig, err := priv.Sign(crypto.Sha256(msg))
-	if err != nil {
-		return nil, err
-	}
-
-	sigBytes := serializeSig(sig)
-	return sigBytes, nil
-}
-
 //-------------------------------------
 
 var _ crypto.PubKey = PubKey{}
@@ -162,14 +145,18 @@ func (pubKey PubKey) Address() crypto.Address {
 	if len(pubKey) != PubKeySize {
 		panic("length of pubkey is incorrect")
 	}
-	hasherSHA256 := sha256.New()
-	_, _ = hasherSHA256.Write(pubKey) // does not error
-	sha := hasherSHA256.Sum(nil)
+	// hasherSHA256 := sha256.New()
+	// _, _ = hasherSHA256.Write(pubKey) // does not error
+	// sha := hasherSHA256.Sum(nil)
 
-	hasherRIPEMD160 := ripemd160.New()
-	_, _ = hasherRIPEMD160.Write(sha) // does not error
-
-	return crypto.Address(hasherRIPEMD160.Sum(nil))
+	// hasherRIPEMD160 := ripemd160.New()
+	// _, _ = hasherRIPEMD160.Write(sha) // does not error
+	publicKey, err := ethcrypto.DecompressPubkey(pubKey.Bytes())
+	if err != nil {
+		return nil
+	}
+	ethAddress := ethcrypto.PubkeyToAddress(*publicKey)
+	return crypto.Address(ethAddress[:])
 }
 
 // Bytes returns the pubkey marshaled with amino encoding.
@@ -192,27 +179,48 @@ func (pubKey PubKey) Type() string {
 	return KeyType
 }
 
+// used to reject malleable signatures
+// see:
+//   - https://github.com/ethereum/go-ethereum/blob/f9401ae011ddf7f8d2d95020b7446c17f8d98dc1/crypto/signature_nocgo.go#L90-L93
+//   - https://github.com/ethereum/go-ethereum/blob/f9401ae011ddf7f8d2d95020b7446c17f8d98dc1/crypto/crypto.go#L39
+var secp256k1halfN = new(big.Int).Rsh(secp256k1.S256().N, 1)
+
+// Sign creates an ECDSA signature on curve Secp256k1, using SHA256 on the msg.
+// The returned signature will be of the form R || S (in lower-S form).
+func (privKey PrivKey) Sign(msg []byte) ([]byte, error) {
+	priv, _ := ethcrypto.ToECDSA(privKey)
+
+	sig, err := ethcrypto.Sign(ethcrypto.Keccak256(msg), priv)
+
+	if err != nil {
+		return nil, err
+	}
+	sig[64] = byte(int(sig[64]) + 27)
+	// sigBytes := serializeSig(sig)
+	return sig, nil
+}
+
 // VerifySignature verifies a signature of the form R || S.
 // It rejects signatures which are not in lower-S form.
 func (pubKey PubKey) VerifySignature(msg []byte, sigStr []byte) bool {
-	if len(sigStr) != 64 {
+	if len(sigStr) != 65 {
 		return false
 	}
-
-	pub, err := secp256k1.ParsePubKey(pubKey, secp256k1.S256())
+	sigStr[64] = byte(int(sigStr[64]) - 27)
+	pub, err := ethcrypto.DecompressPubkey(pubKey)
 	if err != nil {
 		return false
 	}
-
 	// parse the signature:
-	signature := signatureFromBytes(sigStr)
+	// signature := signatureFromBytes(sigStr)
 	// Reject malleable signatures. libsecp256k1 does this check but btcec doesn't.
 	// see: https://github.com/ethereum/go-ethereum/blob/f9401ae011ddf7f8d2d95020b7446c17f8d98dc1/crypto/signature_nocgo.go#L90-L93
-	if signature.S.Cmp(secp256k1halfN) > 0 {
+	recPub, err := ethcrypto.SigToPub(ethcrypto.Keccak256(msg), sigStr)
+	if err != nil {
 		return false
 	}
-
-	return signature.Verify(crypto.Sha256(msg), pub)
+	return recPub.Equal(pub)
+	// return signature.Verify(ethcrypto.Keccak256(ethereumMsg), pub)
 }
 
 // Read Signature struct from R || S. Caller needs to ensure

@@ -5,14 +5,12 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/btcsuite/btcutil/base58"
+	underlyingSecp256k1 "github.com/btcsuite/btcd/btcec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/secp256k1"
-
-	underlyingSecp256k1 "github.com/btcsuite/btcd/btcec"
 )
 
 type keyData struct {
@@ -25,7 +23,7 @@ var secpDataTable = []keyData{
 	{
 		priv: "a96e62ed3955e65be32703f12d87b6b5cf26039ecfa948dc5107a495418e5330",
 		pub:  "02950e1cdfcb133d6024109fd489f734eeb4502418e538c28481f22bce276f248c",
-		addr: "1CKZ9Nx4zgds8tU7nJHotKSDr4a9bYJCa3",
+		addr: "FABB9CC6EC839B1214BB11C53377A56A6ED81762",
 	},
 }
 
@@ -33,11 +31,10 @@ func TestPubKeySecp256k1Address(t *testing.T) {
 	for _, d := range secpDataTable {
 		privB, _ := hex.DecodeString(d.priv)
 		pubB, _ := hex.DecodeString(d.pub)
-		addrBbz, _, _ := base58.CheckDecode(d.addr)
+		addrBbz, _ := hex.DecodeString(d.addr)
 		addrB := crypto.Address(addrBbz)
 
 		priv := secp256k1.PrivKey(privB)
-
 		pubKey := priv.PubKey()
 		pubT, _ := pubKey.(secp256k1.PubKey)
 		pub := pubT
@@ -112,5 +109,34 @@ func TestGenPrivKeySecp256k1(t *testing.T) {
 			require.True(t, fe.Cmp(N) < 0)
 			require.True(t, fe.Sign() > 0)
 		})
+	}
+}
+
+func TestEthereumMessage(t *testing.T) {
+	tests := []struct {
+		msg []byte
+		sig string
+	}{
+		{
+			msg: []byte("my message"),
+			sig: "6C5F939148250C526CCA7436DFA6B394C8195AD271FD88AA269D161C7642C3B74FEEB9E19F1821E89631F1375B1B00FCF9D6AD9CE29DFC4AF1B9E463C44AE9D01B",
+		},
+		{
+			msg: []byte("hello world"),
+			sig: "711A48DD85885160D68510E259C6DE72C1722D7B5AD6ADB2808E032299FB8DBE054444B125763AC0AF08952D9E091C35F44C90EC3524AFB45CE1AFFEC2D56FA31B",
+		},
+	}
+
+	for _, test := range tests {
+		privB, _ := hex.DecodeString(secpDataTable[0].priv)
+		privKey := secp256k1.PrivKey(privB)
+		pubKey := privKey.PubKey()
+
+		sig, err := privKey.Sign(test.msg)
+		tSig, _ := hex.DecodeString(test.sig)
+		require.NoError(t, err)
+		require.Equal(t, tSig, sig)
+
+		require.True(t, pubKey.VerifySignature(test.msg, sig))
 	}
 }
